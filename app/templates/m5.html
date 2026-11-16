@@ -1,27 +1,113 @@
 {% extends "base.html" %}
+{% block body_attrs %}data-standalone="m5"{% endblock %}
+{% block extra_head %}<link rel="stylesheet" href="/static/m5.css">{% endblock %}
 {% block content %}
-<section class="kpis">
-  <div class="kpi"><b>含税额</b><strong>4</strong><small>条</small></div>
-  <div class="kpi"><b>通过</b><strong>2</strong><small>条</small></div>
-  <div class="kpi"><b>隔离</b><strong>2</strong><small>条</small></div>
-  <div class="kpi"><b>规则版</b><strong>1.5</strong><small>v</small></div>
+<section class="kpis kpis--five">
+  <div class="kpi"><b>当前应付</b><strong id="kpi-payable">—</strong><small>CNY</small></div>
+  <div class="kpi"><b>验收原额</b><strong id="kpi-original">—</strong><small>CNY</small></div>
+  <div class="kpi"><b>撤销金额</b><strong id="kpi-revoked">—</strong><small>CNY</small></div>
+  <div class="kpi"><b>待追回</b><strong id="kpi-pending">—</strong><small>CNY</small></div>
+  <div class="kpi"><b>已结清追回</b><strong id="kpi-settled">—</strong><small>CNY</small></div>
 </section>
-<div class="grid grid--quad">
+
+<div class="grid grid--m5">
   <section class="panel">
-    <div class="panel__head"><h2>多对多匹配</h2><span class="state state--ok">通过</span></div>
+    <div class="panel__head"><h2>验收单（原额 / 占用 / 可用）</h2>
+      <span class="panel__meta" id="invariant-badge">对账中</span></div>
     <div class="panel__body panel__body--scroll">
-      <table class="ledger"><thead><tr><th>序号</th><th>业务键</th><th>状态</th><th class="num">值</th></tr></thead>
-      <tbody>{% for row in rows %}<tr><td class="num">{{ loop.index }}</td><td>{{ row.key }}</td><td>{{ row.status }}</td><td class="num">{{ row.value }}</td></tr>{% endfor %}</tbody></table>
+      <table class="ledger">
+        <thead><tr><th>验收单</th><th>货号/税率</th><th class="num">原额</th><th class="num">占用</th>
+          <th class="num">可用</th><th class="num">已付/保留</th><th>版本</th><th>状态</th></tr></thead>
+        <tbody id="gr-body"><tr><td colspan="8" class="empty">暂无单据，点击「载入演示单据」</td></tr></tbody>
+      </table>
     </div>
   </section>
-  <section class="panel panel--evidence">
-    <div class="panel__head"><h2>证据</h2><span class="panel__meta">6 条</span></div>
-    <div class="panel__body"><div class="evidence"><b>RUN-659-5</b><span>LINE 6</span><code>/api/matches/solve</code></div><pre id="result">等待运行</pre></div>
+
+  <section class="panel">
+    <div class="panel__head"><h2>发票（可匹配余额）</h2></div>
+    <div class="panel__body panel__body--scroll">
+      <table class="ledger">
+        <thead><tr><th>发票</th><th>货号/税率</th><th class="num">原额</th><th class="num">占用</th>
+          <th class="num">可用</th><th class="num">已付</th></tr></thead>
+        <tbody id="iv-body"></tbody>
+      </table>
+    </div>
   </section>
-  <section class="panel panel--status">
-    <div class="panel__head"><h2>原因分布</h2><span class="panel__meta">2 类</span></div>
-    <div class="panel__body"><div class="bar"><i style="width:79%"></i></div><div class="legend"><span>采纳 4</span><span>隔离 2</span></div></div>
+
+  <section class="panel panel--wide">
+    <div class="panel__head"><h2>匹配凭证（付款 / 撤销后保留或释放，凭证永不删除）</h2></div>
+    <div class="panel__body panel__body--scroll">
+      <table class="ledger">
+        <thead><tr><th>凭证</th><th>验收单</th><th>发票</th><th class="num">原额</th>
+          <th class="num">已付</th><th class="num">已释放</th><th class="num">保留</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody id="link-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel__head"><h2>待追回（红字到账前列示，不回补余额）</h2></div>
+    <div class="panel__body panel__body--scroll">
+      <table class="ledger">
+        <thead><tr><th>追回号</th><th>凭证</th><th class="num">金额</th><th class="num">待余</th>
+          <th>状态</th><th>红字登记</th></tr></thead>
+        <tbody id="recovery-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel panel--wide">
+    <div class="panel__head"><h2>登记操作</h2><span class="panel__meta">所有写操作带幂等键，重试不重复</span></div>
+    <div class="panel__body">
+      <div class="forms">
+        <form data-action="seed" class="form-card form-card--seed">
+          <h3>演示数据</h3>
+          <p class="hint">幂等写入 GR-1/2/3 与 IV-1/2，随后可在凭证行登记付款与撤销。</p>
+          <button class="btn btn--primary">载入演示单据</button>
+        </form>
+        <form data-action="gr" class="form-card">
+          <h3>验收单</h3>
+          <input name="gr_id" placeholder="验收单号 GR-x" required>
+          <input name="sku" placeholder="货号 SKU-A" required>
+          <input name="tax_rate" placeholder="税率 0.13" required>
+          <input name="amount" placeholder="含税额" inputmode="decimal" required>
+          <button class="btn btn--primary">登记验收单</button>
+        </form>
+        <form data-action="invoice" class="form-card">
+          <h3>发票</h3>
+          <input name="invoice_id" placeholder="发票号 IV-x" required>
+          <input name="sku" placeholder="货号 SKU-A" required>
+          <input name="tax_rate" placeholder="税率 0.13" required>
+          <input name="amount" placeholder="含税额" inputmode="decimal" required>
+          <button class="btn btn--primary">登记发票</button>
+        </form>
+        <form data-action="match" class="form-card">
+          <h3>匹配占用</h3>
+          <input name="gr_id" placeholder="验收单号" required>
+          <input name="invoice_id" placeholder="发票号" required>
+          <input name="amount" placeholder="匹配金额" inputmode="decimal" required>
+          <button class="btn btn--primary">登记匹配</button>
+        </form>
+        <form data-action="revoke" class="form-card form-card--warn">
+          <h3>撤销（补偿流程）</h3>
+          <input name="gr_id" placeholder="验收单号" required>
+          <input name="expected_version" placeholder="版本号（并发校验，可选）" inputmode="numeric">
+          <input name="idempotency_key" placeholder="幂等键，如 REV-20261116-01" required>
+          <button class="btn btn--warn">撤销验收单</button>
+        </form>
+        <form data-action="resume" class="form-card">
+          <h3>补偿恢复</h3>
+          <p class="hint">中断的撤销 saga 从未完成步骤继续，已完成步骤不重复执行。</p>
+          <button class="btn">恢复中断补偿</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel panel--wide">
+    <div class="panel__head"><h2>操作回执</h2><span class="panel__meta">失败保留原匹配，可安全重试</span></div>
+    <div class="panel__body"><pre id="result">等待操作</pre></div>
   </section>
 </div>
+<script src="/static/matching.js"></script>
 {% endblock %}
-

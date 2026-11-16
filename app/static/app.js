@@ -2,6 +2,8 @@ const ui = {running: false};
 const run = document.querySelector("#run");
 const out = document.querySelector("#result");
 const feedback = document.querySelector("#feedback");
+/* M5 匹配页由 static/matching.js 自行管理 #run 与 #result，跳过通用样例运行 */
+if (run && !document.body.dataset.standalone){
 async function execute(){
   if(ui.running) return;
   ui.running = true; feedback.textContent = "运行中"; run.disabled = true;
@@ -14,4 +16,5 @@ async function execute(){
   finally{ ui.running = false; run.disabled = false; }
 }
 run?.addEventListener("click", execute);
+}
 
